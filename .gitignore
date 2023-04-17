@@ -136,3 +136,4 @@ dmypy.json
 *.dcm
 *.ply
 *.h5
+*.gif
