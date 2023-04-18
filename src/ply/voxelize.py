@@ -5,22 +5,26 @@ from ply.utils import full_load_ply
 
 
 
+def get_vox_idx(mesh, inc, voxres, voxshape, origin, directions):
+    is_inside = lambda i: np.all((0 <= i) & (i < voxshape), axis=1)
+    # Subdivide mesh so you have at least one point per voxel
+    verts, _  = tm.remesh.subdivide_to_size(mesh.vertices + inc, mesh.faces,
+                                            max_edge=voxres / 2, max_iter=20)
+    # Translate to DICOMs (input) coordinate. Directions given by line => right multiplication
+    verts = (verts - origin) @ np.linalg.inv(directions)
+    # Convert to voxel indexes (that represent leaflets)
+    idx = np.round(verts * voxshape).astype(int) # Scale to number of voxel
+    # Ensure all indexes are inside input voxel grid
+    return np.unique(idx[is_inside(idx)], axis=0)
+
 def _extrude(mesh, voxres, voxshape, origin, directions, extrude_vec, extrude=0.003):
     """ Code from Sverre Herland """
     # Voxelize every increment around surface with proper spacing to get a full volume
     increments = np.stack([np.arange(-extrude / 2, extrude / 2, vr) for vr in voxres])
     allidx = [] # Accumulate points in subdivided meshes, it'll be your positive voxels
-    is_inside = lambda i: np.all((0 <= i) & (i < voxshape), axis=1)
     for i in range(increments.shape[-1]):
         inc = increments[:,i]
-        # Subdivide mesh so you have at least a point per voxel
-        verts, _ = tm.remesh.subdivide_to_size(mesh.vertices + inc * extrude_vec, mesh.faces,
-                                               max_edge=voxres / 2, max_iter=20)
-        # Translate to DICOMs coordinate, directions given by line => right multiplication
-        verts = (verts - origin) @ np.linalg.inv(directions)
-        # Convert to voxel indexes (the one that represent leaflets)
-        idx = np.round(verts * voxshape).astype(int) # Scale to number of voxel
-        allidx.append(np.unique(idx[is_inside(idx)], axis=0))
+        allidx.append(get_vox_idx(mesh, inc * extrude_vec, voxres, voxshape, origin, directions))
     allidx = np.unique(np.concatenate(allidx, axis=0), axis=0)
     voxel_grid = np.zeros(voxshape, dtype=bool)
     # Set voxels inside leaflets to True
@@ -51,52 +55,27 @@ def normal_extrude(fname, voxres, voxshape, origin, directions, extrude=0.003):
     mesh = tm.Trimesh(**dict_mesh)
     return _extrude(mesh, voxres, voxshape, origin, directions, mesh.vertex_normals, extrude)
 
-
-def _rg_extrude(fname, voxres, voxshape, origin, directions, extrude=0.003):
+def filter_extrude(fname, voxres, voxshape, origin, directions, vinput, extrude=0.003, div=5):
+    """
+    Extrude along each vertices normals of half `extrude` value in each direction of the normal.
+    Then refine volume by filtering out outlier voxels with intensity out of mean ± std.
+    """
     with open(fname, "br") as fd:
         dict_mesh = full_load_ply(fd, prefer_color="face")
     mesh = tm.Trimesh(**dict_mesh)
     # Bounding box annotation
     box = _extrude(mesh, voxres, voxshape, origin, directions, mesh.vertex_normals, extrude)
-    # Get voxels containing the *surface*, and extract their voxel intensity
-    is_inside = lambda i: np.all((0 <= i) & (i < voxshape), axis=1)
-    verts, _ = tm.remesh.subdivide_to_size(mesh.vertices, mesh.faces,
-                                           max_edge=voxres / 2, max_iter=20)
-    verts = (verts - origin) @ np.linalg.inv(directions)
-    idx = np.round(verts * voxshape).astype(int)
-    idx = np.unique(idx[is_inside(idx)], axis=0) # Ensure it's inside the voxel grid
-    return box, idx
-
-def region_growing_extrude(fname, voxres, voxshape, origin, directions, vinput, extrude=0.003):
-    """
-    Extrude along each vertices normals of half `extrude` value in each direction of the normal.
-    Then refine volume by keeping voxels which intensity is close enough to the surface ones (mean ± std).
-    """
-    box, idx = _rg_extrude(fname, voxres, voxshape, origin, directions, extrude=extrude)
-    seed = vinput[idx[:,0], idx[:,1], idx[:,2]]
-    mean, std = np.mean(seed), np.std(seed)
-    # Filter annotation to contain voxels close in brightness to surface only
-    cond = lambda x: (mean - std <= x) & (x <= mean + std)
-    return np.where(cond(vinput), box, False)
-
-def subdiv_region_growing_extrude(fname, voxres, voxshape, origin, directions, vinput,
-                                  extrude=0.003, div=5):
-    """
-    Extrude along each vertices normals of half `extrude` value in each direction of the normal.
-    Then refine volume by keeping voxels which intensity is close enough to the surface ones (mean ± std).
-    Here, mean and std are computed for subpart of the surface.
-    """
-    box, idx = _rg_extrude(fname, voxres, voxshape, origin, directions, extrude=extrude)
+    idx = np.argwhere(box) # Box is a boolean array
     out = np.zeros_like(box)
     rmin, rmax = np.min(idx, axis=0), np.max(idx, axis=0) # Indexes range of surface
     strides = ((rmax - rmin) / div).astype(int)
-    cond = lambda x: (mean - std <= x) #& (x <= mean + std)
-    #cond = lambda x: mean <= x
+    keep = lambda x: (mean - std <= x)# & (x <= mean + std)
     is_inside = lambda l: np.all((inf <= l) & (l < sup), axis=1)
     bound = lambda x, axis: min(x + strides[axis], voxshape[axis])
-    for i in range(rmin[0], rmax[0], strides[0]):
-        for j in range(rmin[1], rmax[1], strides[1]):
-            for k in range(rmin[2], rmax[2], strides[2]):
+    # Filter voxels
+    for i in range(rmin[0], rmax[0], max(strides[0], 1)):
+        for j in range(rmin[1], rmax[1], max(strides[1], 1)):
+            for k in range(rmin[2], rmax[2], max(strides[2], 1)):
                 # Subdivided seed for more precision
                 inf, sup = (i, j, k), (bound(i, 0), bound(j, 1), bound(k, 2))
                 sidx = np.unique(idx[is_inside(idx)], axis=0)
@@ -105,5 +84,37 @@ def subdiv_region_growing_extrude(fname, voxres, voxshape, origin, directions, v
                 seed = vinput[sidx[:,0], sidx[:,1], sidx[:,2]]
                 mean, std = np.mean(seed), np.std(seed)
                 # Filter annotation to contain voxels close in brightness to surface only
-                out[sidx] = np.where(cond(vinput[sidx]), box[sidx], False)
+                out[sidx] = np.where(keep(vinput[sidx]), box[sidx], False)
+    return out
+
+def region_growing(fname, voxres, voxshape, origin, directions, vinput, extrude=0.003, div=5):
+    """
+    Extrude along each vertices normals of half `extrude` value in each direction of the normal.
+    Then refine volume by keeping voxels which intensity is close enough to the *surface* ones (mean ± std).
+    """
+    with open(fname, "br") as fd:
+        dict_mesh = full_load_ply(fd, prefer_color="face")
+    mesh = tm.Trimesh(**dict_mesh)
+    # Bounding box annotation
+    box = _extrude(mesh, voxres, voxshape, origin, directions, mesh.vertex_normals, extrude)
+    idx = get_vox_idx(mesh, 0, voxres, voxshape, origin, directions) # Surface voxels
+    out = np.zeros_like(box)
+    rmin, rmax = np.min(idx, axis=0), np.max(idx, axis=0) # Indexes range of surface
+    strides = ((rmax - rmin) / div).astype(int)
+    keep = lambda x: (mean - std <= x)# & (x <= mean + std)
+    is_inside = lambda l: np.all((inf <= l) & (l < sup), axis=1)
+    bound = lambda x, axis: min(x + strides[axis], voxshape[axis])
+    # Filter voxels
+    for i in range(rmin[0], rmax[0], max(strides[0], 1)):
+        for j in range(rmin[1], rmax[1], max(strides[1], 1)):
+            for k in range(rmin[2], rmax[2], max(strides[2], 1)):
+                # Subdivided seed for more precision
+                inf, sup = (i, j, k), (bound(i, 0), bound(j, 1), bound(k, 2))
+                sidx = np.unique(idx[is_inside(idx)], axis=0)
+                if sidx.size == 0:
+                    continue
+                seed = vinput[sidx[:,0], sidx[:,1], sidx[:,2]]
+                mean, std = np.mean(seed), np.std(seed)
+                # Filter annotation to contain voxels close in brightness to surface only
+                out[sidx] = np.where(keep(vinput[sidx]), box[sidx], False)
     return out
