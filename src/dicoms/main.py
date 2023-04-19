@@ -17,7 +17,6 @@ from dicoms.voxelize import frames2vox
 
 
 def dcmseq2vox(dcm_src, hdf, voxres, bbox):
-    vox = hdf.create_group("/CartesianVolumes")
     info = hdf["VolumeGeometry"]
     if "frameTimes" in info.keys():
         # Voxelize only listed frames (aka annotated close valve)

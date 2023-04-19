@@ -13,7 +13,7 @@ from ply import plyseq2vox
 
 
 
-def seq2vox(dname, pdir, opath, voxres, thickness, normals):
+def seq2vox(dname, pdir, opath, voxres, thickness, mode):
     CoInitialize() # Needed to work with comtypes and multithread
     if dname.suffix != ".dcm":
         print(f"Ignoring {dname.name}, not a DICOM.")
@@ -23,12 +23,12 @@ def seq2vox(dname, pdir, opath, voxres, thickness, normals):
     bbox = load_dcm_info(src, hdf)
     info = hdf["VolumeGeometry"]
     # Voxelize inputs
-    frames, all_times = dcmseq2vox(src, hdf, voxres, bbox)
+    frames = dcmseq2vox(src, hdf, voxres, bbox)
     # Will voxelize and add to HDF, ground truth, frame times and number of frame
-    plyseq2vox(pdir.joinpath(dname.stem), hdf, info["origin"][()], info["directions"][()],
-               voxres, info["shape"][()], thickness, normals)
+    plyseq2vox(pdir.joinpath(dname.stem), frames, hdf, info["origin"][()],
+               info["directions"][()], voxres, thickness, mode)
     # Save only frame that have an annotation
-    save_selected_frames(frames, hdf, all_times)
+    save_selected_frames(frames, hdf)
     hdf.close()
 
 
@@ -41,14 +41,15 @@ def seq2vox(dname, pdir, opath, voxres, thickness, normals):
             nargs=3, default=[0.0007] * 3, help="Resolution of a voxel in millimeter.")
 @cli.option("--thickness", "-t", type=cli.FloatRange(min=0), default=0.003,
             help="Thickness of extruded leaflets' segmentation in millimeter.")
-@cli.option("--normals/--eigen", " / -E", default=True,
-            help="Wether to use mesh normals or smallest eigen vector to extrude")
+@cli.option("--extrusion-mode", "-m", "mode", default="normal",
+            type=cli.Choice(["eigen", "normal", "filter", "region-growing"], case_sensitive=False),
+            help="Which extrusion method to use (see README.txt).")
 @cli.option("--ouput-directory", "-o", "opath", type=cli.Path(resolve_path=True,
             path_type=WindowsPath, file_okay=False), default="voxels",
             help="Where to store generated voxels.")
 @cli.option("--number-workers", "-n", "nb_workers", type=cli.IntRange(min=1), default=1,
             help="Number of workers used to accelerate file processing.")
-def all2vox(plydir, dcmdir, voxres, thickness, normals, opath, nb_workers):
+def all2vox(plydir, dcmdir, voxres, thickness, mode, opath, nb_workers):
     """
     Convert given DICOMs and associated triangle meshes to voxel grids. Inputs are expected to
     be grouped by sequence. Results will be stored in `output-directory/sequence-name.h5`.
@@ -62,7 +63,7 @@ def all2vox(plydir, dcmdir, voxres, thickness, normals, opath, nb_workers):
     opath.mkdir(exist_ok=True)
     voxres = np.array(voxres)
     nb_sequences = len(list(dcmdir.glob("*.dcm")))
-    thread_map(lambda fname: seq2vox(fname, plydir, opath, voxres, thickness, normals),
+    thread_map(lambda fname: seq2vox(fname, plydir, opath, voxres, thickness, mode),
                dcmdir.iterdir(), max_workers=nb_workers,
                # Pretty loading bar
                desc="Processed", unit="sequence", total=nb_sequences, colour="green")

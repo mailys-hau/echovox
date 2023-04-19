@@ -31,14 +31,13 @@ def frame2arr(frame):
     return np.copy(arr3d)
 
 
-def save_selected_frames(frames, hdf, all_times):
+def save_selected_frames(frames, hdf):
     try:
         to_save = hdf["VolumeGeometry"]["frameTimes"][()]
     except KeyError:
-        to_save = all_times
-        hdf["VolumeGeometry"].create_dataset("frameNumber", data=len(all_times))
-        hdf["VolumeGeometry"].create_dataset("frameTimes", data=all_times)
-    idx = np.argwhere(np.isin(to_save, all_times)).flatten()
+        to_save = np.array(frames.keys())
+        hdf["VolumeGeometry"].create_dataset("frameNumber", data=len(to_save))
+        hdf["VolumeGeometry"].create_dataset("frameTimes", data=to_save)
     vol = hdf.create_group("/CartesianVolume")
-    for i in range(len(to_save)):
-        vol.create_dataset(f"vol{i + 1:02d}", data=frames[idx[i]])
+    for i, f in enumerate(to_save):
+        vol.create_dataset(f"vol{i + 1:02d}", data=frames[f])
