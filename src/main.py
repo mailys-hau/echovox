@@ -13,7 +13,7 @@ from ply import plyseq2vox
 
 
 
-def seq2vox(dname, pdir, opath, voxres, thickness, mode):
+def seq2vox(dname, pdir, opath, voxres, thickness, mode, contrast):
     CoInitialize() # Needed to work with comtypes and multithread
     if dname.suffix != ".dcm":
         print(f"Ignoring {dname.name}, not a DICOM.")
@@ -23,7 +23,7 @@ def seq2vox(dname, pdir, opath, voxres, thickness, mode):
     bbox = load_dcm_info(src, hdf)
     info = hdf["VolumeGeometry"]
     # Voxelize inputs
-    frames = dcmseq2vox(src, hdf, voxres, bbox)
+    frames = dcmseq2vox(src, hdf, voxres, bbox, contrast)
     # Will voxelize and add to HDF, ground truth, frame times and number of frame
     plyseq2vox(pdir.joinpath(dname.stem), frames, hdf, info["origin"][()],
                info["directions"][()], voxres, thickness, mode)
@@ -44,12 +44,14 @@ def seq2vox(dname, pdir, opath, voxres, thickness, mode):
 @cli.option("--extrusion-mode", "-m", "mode", default="normal",
             type=cli.Choice(["eigen", "normal", "filter", "region-growing"], case_sensitive=False),
             help="Which extrusion method to use (see README.txt).")
+@cli.option("--contrast/--no-contrast", "-c/ ", is_flag=True, default=False,
+            help="Whether to use lookup table to enhance input contrast.")
 @cli.option("--ouput-directory", "-o", "opath", type=cli.Path(resolve_path=True,
             path_type=WindowsPath, file_okay=False), default="voxels",
             help="Where to store generated voxels.")
 @cli.option("--number-workers", "-n", "nb_workers", type=cli.IntRange(min=1), default=1,
             help="Number of workers used to accelerate file processing.")
-def all2vox(plydir, dcmdir, voxres, thickness, mode, opath, nb_workers):
+def all2vox(plydir, dcmdir, voxres, thickness, mode, contrast, opath, nb_workers):
     """
     Convert given DICOMs and associated triangle meshes to voxel grids. Inputs are expected to
     be grouped by sequence. Results will be stored in `output-directory/sequence-name.h5`.
@@ -60,10 +62,12 @@ def all2vox(plydir, dcmdir, voxres, thickness, mode, opath, nb_workers):
     PLYDIR    PATH    Directory of triangle meshes.
     DCMDIR    PATH    Directory of input dicoms (3D TEE).
     """
+    #FIXME: Accept per sequence contrast
+    #TODO: If no path given for contrast use default LUT and print warning
     opath.mkdir(exist_ok=True)
     voxres = np.array(voxres)
     nb_sequences = len(list(dcmdir.glob("*.dcm")))
-    thread_map(lambda fname: seq2vox(fname, plydir, opath, voxres, thickness, mode),
+    thread_map(lambda fname: seq2vox(fname, plydir, opath, voxres, thickness, mode, contrast),
                dcmdir.iterdir(), max_workers=nb_workers,
                # Pretty loading bar
                desc="Processed", unit="sequence", total=nb_sequences, colour="green")

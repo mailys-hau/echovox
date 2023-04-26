@@ -16,7 +16,7 @@ from dicoms.voxelize import frames2vox
 
 
 
-def dcmseq2vox(dcm_src, hdf, voxres, bbox):
+def dcmseq2vox(dcm_src, hdf, voxres, bbox, contrast):
     info = hdf["VolumeGeometry"]
     if "frameTimes" in info.keys():
         # Voxelize only listed frames (aka annotated close valve)
@@ -26,7 +26,7 @@ def dcmseq2vox(dcm_src, hdf, voxres, bbox):
     res = np.round(np.linalg.norm(info["directions"], axis=1) / voxres)
     max_res = np.ctypeslib.as_ctypes(res.astype(np.ushort))
     info.create_dataset("resolution", data=voxres)
-    return frames2vox(dcm_src, hdf, bbox, max_res)
+    return frames2vox(dcm_src, hdf, bbox, max_res, contrast)
 
 
 
