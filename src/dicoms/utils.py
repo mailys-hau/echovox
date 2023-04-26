@@ -32,6 +32,7 @@ def frame2arr(frame):
 
 
 def save_selected_frames(frames, hdf):
+    # frames are ordered, so is potential to_save
     try:
         to_save = hdf["VolumeGeometry"]["frameTimes"][()]
     except KeyError:

@@ -11,6 +11,7 @@ def frames2vox(dcm_src, hdf, bbox, max_res, contrast):
     for f in range(nb_frames):
         frame = dcm_src.GetFrame(f, bbox, max_res)
         arr = frame2arr(frame)
+        # Since Python3.7, dict are ordered. This will yield ordered frames
         out[frame.time] = LUT[arr] if contrast else arr
     #FIXME? Assume same shape for every frame
     hdf["VolumeGeometry"].create_dataset("shape", data=list(out.values())[0].shape)
