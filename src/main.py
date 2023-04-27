@@ -45,7 +45,8 @@ def seq2vox(dname, pdir, opath, voxres, thickness, mode, contrast):
             type=cli.Choice(["eigen", "normal", "filter", "region-growing"], case_sensitive=False),
             help="Which extrusion method to use (see README.txt).")
 @cli.option("--contrast/--no-contrast", "-c/ ", is_flag=True, default=False,
-            help="Whether to use lookup table to enhance input contrast.")
+            help=("Whether to use lookup table to enhance input contrast."
+                  " If one is contained in the DICOM, use it, otherwise, use a generic one."))
 @cli.option("--ouput-directory", "-o", "opath", type=cli.Path(resolve_path=True,
             path_type=WindowsPath, file_okay=False), default="voxels",
             help="Where to store generated voxels.")
@@ -62,8 +63,6 @@ def all2vox(plydir, dcmdir, voxres, thickness, mode, contrast, opath, nb_workers
     PLYDIR    PATH    Directory of triangle meshes.
     DCMDIR    PATH    Directory of input dicoms (3D TEE).
     """
-    #FIXME: Accept per sequence contrast
-    #TODO: If no path given for contrast use default LUT and print warning
     opath.mkdir(exist_ok=True)
     voxres = np.array(voxres)
     nb_sequences = len(list(dcmdir.glob("*.dcm")))
