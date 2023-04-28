@@ -88,7 +88,7 @@ def filter_extrude(fname, vinput, origin, directions, voxres, extrude=0.003, div
                 out[sidx] = np.where(keep(vinput[sidx]), box[sidx], False)
     return out
 
-def region_growing(fname, vinput, origin, directions, voxres, extrude=0.003, div=1):
+def region_growing(fname, vinput, origin, directions, voxres, extrude=0.003, div=2):
     """
     Extrude along each vertices normals of half `extrude` value in each direction of the normal.
     Then refine volume by keeping voxels which intensity is close enough to the *surface* ones (mean ± std).
