@@ -1,5 +1,7 @@
 import numpy as np
+import scipy.ndimage as sci
 
+from ply.postprocess import post_process
 from ply.voxelize import *
 
 
@@ -10,7 +12,7 @@ MODE = {"eigen": eigen_extrude, "normal": normal_extrude,
 
 
 
-def plyseq2vox(sequence, frames, hdf, origin, directions, voxres, thickness, mode):
+def plyseq2vox(sequence, frames, hdf, origin, directions, voxres, thickness, mode, pmode):
     """ Voxelize every frames' annotation in a sequence """
     # HDF file is expected to be open and close outside this function
     mesh2vox = MODE[mode]
@@ -22,8 +24,8 @@ def plyseq2vox(sequence, frames, hdf, origin, directions, voxres, thickness, mod
         t = float(afname.stem.split('-')[1])
         times.append(t)
         pfname = afname.with_stem(f"posterior-{times[-1]}")
-        anteriors[t] = mesh2vox(afname, frames[t], origin, directions, voxres, thickness)
-        posteriors[t] = mesh2vox(pfname, frames[t], origin, directions, voxres, thickness)
+        anteriors[t] = post_process(mesh2vox(afname, frames[t], origin, directions, voxres, thickness), pmode)
+        posteriors[t] = post_process(mesh2vox(pfname, frames[t], origin, directions, voxres, thickness), pmode)
     info = hdf["VolumeGeometry"]
     info.create_dataset("frameNumber", data=len(times))
     # There's no garanty iterdir sorts files, so we ensure it

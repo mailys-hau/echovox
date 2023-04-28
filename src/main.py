@@ -13,7 +13,7 @@ from ply import plyseq2vox
 
 
 
-def seq2vox(dname, pdir, opath, voxres, thickness, mode, contrast):
+def seq2vox(dname, pdir, opath, voxres, thickness, mode, contrast, postprocess):
     CoInitialize() # Needed to work with comtypes and multithread
     if dname.suffix != ".dcm":
         print(f"Ignoring {dname.name}, not a DICOM.")
@@ -26,7 +26,7 @@ def seq2vox(dname, pdir, opath, voxres, thickness, mode, contrast):
     frames = dcmseq2vox(src, hdf, voxres, bbox, contrast)
     # Will voxelize and add to HDF, ground truth, frame times and number of frame
     plyseq2vox(pdir.joinpath(dname.stem), frames, hdf, info["origin"][()],
-               info["directions"][()], voxres, thickness, mode)
+               info["directions"][()], voxres, thickness, mode, postprocess)
     # Save only frame that have an annotation
     save_selected_frames(frames, hdf)
     hdf.close()
@@ -47,12 +47,16 @@ def seq2vox(dname, pdir, opath, voxres, thickness, mode, contrast):
 @cli.option("--contrast/--no-contrast", "-c/ ", is_flag=True, default=False,
             help=("Whether to use lookup table to enhance input contrast."
                   " If one is contained in the DICOM, use it, otherwise, use a generic one."))
+@cli.option("--postprocess", "-p",
+            type=cli.Choice(["erosion", "dilation", "opening", "closing", "fill-holes"], case_sensitive=False),
+            help=("If you want some binary post-processing on the annotation voxel grid. "
+                  "This is useful for filter and region-growing extrusion."))
 @cli.option("--ouput-directory", "-o", "opath", type=cli.Path(resolve_path=True,
             path_type=WindowsPath, file_okay=False), default="voxels",
             help="Where to store generated voxels.")
 @cli.option("--number-workers", "-n", "nb_workers", type=cli.IntRange(min=1), default=1,
             help="Number of workers used to accelerate file processing.")
-def all2vox(plydir, dcmdir, voxres, thickness, mode, contrast, opath, nb_workers):
+def all2vox(plydir, dcmdir, voxres, thickness, mode, contrast, postprocess, opath, nb_workers):
     """
     Convert given DICOMs and associated triangle meshes to voxel grids. Inputs are expected to
     be grouped by sequence. Results will be stored in `output-directory/sequence-name.h5`.
@@ -66,7 +70,8 @@ def all2vox(plydir, dcmdir, voxres, thickness, mode, contrast, opath, nb_workers
     opath.mkdir(exist_ok=True)
     voxres = np.array(voxres)
     nb_sequences = len(list(dcmdir.glob("*.dcm")))
-    thread_map(lambda fname: seq2vox(fname, plydir, opath, voxres, thickness, mode, contrast),
+    thread_map(lambda fname: seq2vox(fname, plydir, opath, voxres, thickness, mode,
+                                     contrast, postprocess),
                dcmdir.iterdir(), max_workers=nb_workers,
                # Pretty loading bar
                desc="Processed", unit="sequence", total=nb_sequences, colour="green")
