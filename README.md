@@ -2,10 +2,6 @@
 ## From 3D ultrasound and surface mesh to voxel grid.
 Convert 3D TEE to voxel grid and extrude mitral annulus surface to voxel grid automatically.
 
-## ToDos
-- [ ] Add `requirements.txt`
-- [x] Add description of extrusion methods
-
 
 ## Requirements
 See `requirements.txt` for all needed Python packages. The scripts are made to run on a Windows system and require Python 3.9.
@@ -17,7 +13,7 @@ We only tested this scripts with General Eletric API.
 
 ## Usage
 #### Convert DICOM and PLY
-`$ python main.py <path/to/ply/files/> <path/to/dicom/files/> [OPTIONS]`. For more information see `$ python main.py -h`.
+`$ python main.py [OPTIONS] PLYDIR DCMDIR`. For more information see `$ python main.py -h`.
 
 This will convert all the frames in an achocardiogram **that are linked to a surface mesh** to voxel grids and save them in HDF files, along with necessary information. The given directories should abide by the following structure:
 ```
@@ -37,7 +33,7 @@ ply/
 |-- ...
 ```
 #### Convert DICOM
-`$ python main.py <path/to/dicom/files/> [OPTIONS]`. For more information see `$ python dicoms/main.py -h`.
+`$ python main.py [OPTIONS] DICOMDIR`. For more information see `$ python dicoms/main.py -h`.
 
 This will convert all frames in an echocardiogram to voxel grids and save them in HDF files, along with necessary information.
 
