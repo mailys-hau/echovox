@@ -1,5 +1,5 @@
 """
-Convert HDFs to NIFTIs and vice versa
+Convert HDFs to NIFTIs and vice versa. Tool box for NTNU-Polimi collaboration.
 """
 
 import click as cli
@@ -9,9 +9,30 @@ import numpy as np
 
 from pathlib import Path
 
-from utils import get_fname
+from utils import get_fname, to_onehot
 
 
+
+def _nii2hdf(iname, gtdir, hdfdir, scaling=[0.5, 0.5, 0.5]):
+    # idir in contained in iname
+    hname = get_fname(iname, hdfdir, ".h5")
+    gtname = get_fname(iname, gtdir, ".nii")
+    iimg = nib.load(iname)
+    hdf = h5py.File(hname, 'w')
+    inp, gt = hdf.create_group("CartesianVolume"), hdf.create_group("GroundTruth")
+    inp.create_dataset("vol01", data=np.array(iimg.dataobj, dtype=np.uint8))
+    # Receive label encoding with 1=mitral annulus, 2=anterior, 3=posterior
+    gtimg = nib.load(gtname)
+    gtarr = np.array(np.array(gtimg.dataobj, dtype=np.uint8))
+    onehot = to_onehot(gtarr, [0, 1])
+    gt.create_dataset("anterior-01", data=onehot[0])
+    gt.create_dataset("posterior-01", data=onehot[1])
+    info = hdf.create_group("VolumeGeometry")
+    info.create_dataset("frameNumber", data=1)
+    info.create_dataset("directions", data=iimg.affine[:3, :3])
+    info.create_dataset("origin", data=iimg.affine[:3, -1])
+    info.create_dataset("resolution", data=np.array(scaling))
+    hdf.close()
 
 def _hdf2nii(fname, idir, gtdir):
     hdf = h5py.File(fname, 'r')
@@ -37,11 +58,25 @@ def main():
     pass
 
 
-@main.command(name="nii2hdf", short_help="ToDo.")
-def nii2hdf():
-    pass
+@main.command(name="nii2hdf", short_help="Convert NIFTIs to HDFs.")
+@cli.argument("idir", type=cli.Path(exists=True, resolve_path=True, path_type=Path, file_okay=False))
+@cli.argument("gtdir", type=cli.Path(exists=True, resolve_path=True, path_type=Path, file_okay=False))
+@cli.option("--hdf-directory", "-d", "hdfdir", default="hdf",
+            type=cli.Path(resolve_path=True, path_type=Path, file_okay=False),
+            help="Where to store all voxel grids.")
+@cli.option("--scaling", "-s", type=cli.Tuple([cli.FloatRange(min=0)] * 3),
+            nargs=3, default=[0.0005] * 3, help="Resolution of a voxel in centimeter.")
+def nii2hdf(idir, gtdir, hdfdir, scaling):
+    hdfdir.mkdir(parents=True, exist_ok=True)
+    # TODO: Multiprocess this loop
+    for fname in idir.iterdir():
+        if fname.suffix != ".nii":
+            print(f"Skipping {fname.name}, not a NIFTI.")
+            continue
+        _nii2hdf(fname, gtdir, hdfdir, scaling)
 
-@main.command(name="hdf2nii", short_help="Convert HDFs to NIFTIs:")
+
+@main.command(name="hdf2nii", short_help="Convert HDFs to NIFTIs.")
 @cli.argument("hdfdir", type=cli.Path(exists=True, resolve_path=True, path_type=Path, file_okay=False))
 @cli.option("--input-directory", "-i", "idir", default="inputs",
             type=cli.Path(resolve_path=True, path_type=Path, file_okay=False),
@@ -49,6 +84,7 @@ def nii2hdf():
 @cli.option("--ground-truth-directory", "-gt", "gtdir", default="ground-truth",
             type=cli.Path(resolve_path=True, path_type=Path, file_okay=False),
             help="Where to store ground truth segmentation mask.")
+#TODO? Add an option that only convert middle frame
 def hdf2nii(hdfdir, idir, gtdir):
     """
     Convert HDFs containing multiple volumes to several NIFTIs each containing one
