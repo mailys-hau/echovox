@@ -78,10 +78,10 @@ def nii2hdf(idir, gtdir, hdfdir, scaling):
 
 @main.command(name="hdf2nii", short_help="Convert HDFs to NIFTIs.")
 @cli.argument("hdfdir", type=cli.Path(exists=True, resolve_path=True, path_type=Path, file_okay=False))
-@cli.option("--input-directory", "-i", "idir", default="inputs",
+@cli.option("--image-directory", "-i", "idir", default="images",
             type=cli.Path(resolve_path=True, path_type=Path, file_okay=False),
             help="Where to store input voxel grids.")
-@cli.option("--ground-truth-directory", "-gt", "gtdir", default="ground-truth",
+@cli.option("--mask-directory", "-m", "gtdir", default="masks",
             type=cli.Path(resolve_path=True, path_type=Path, file_okay=False),
             help="Where to store ground truth segmentation mask.")
 #TODO? Add an option that only convert middle frame
