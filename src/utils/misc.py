@@ -14,3 +14,12 @@ def to_onehot(labels, skip_classes=[0]):
         idx = np.argwhere(labels == c)
         onehot[i, idx[:,0], idx[:,1], idx[:, 2]] = 1
     return onehot
+
+def to_labels(onehot, skip_classes=[]):
+    labels = np.zeros(onehot.shape[1:], dtype=np.uint8)
+    classes = [ c + 1 for c in range(len(onehot)) if c not in skip_classes ]
+    #FIXME: Some voxels are both anterior and posterior
+    for c in classes:
+        idx = np.argwhere(onehot[c - 1] == 1)
+        labels[idx[:,0], idx[:,1], idx[:, 2]] = c
+    return labels

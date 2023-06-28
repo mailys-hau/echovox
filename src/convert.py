@@ -9,7 +9,7 @@ import numpy as np
 
 from pathlib import Path
 
-from utils import get_fname, to_onehot
+from utils import get_fname, to_onehot, to_labels
 
 
 
@@ -47,7 +47,7 @@ def _hdf2nii(fname, idir, gtdir):
         ant = hdf["GroundTruth"][f"anterior-{i + 1:02d}"][()].astype(np.uint8)
         post = hdf["GroundTruth"][f"posterior-{i + 1:02d}"][()].astype(np.uint8)
         gt = np.stack([ant, post])
-        gtimg = nib.Nifti1Image(gt, affine)
+        gtimg = nib.Nifti1Image(to_labels(gt), affine)
         nib.save(iimg, iname)
         nib.save(gtimg, gtname)
     hdf.close()
