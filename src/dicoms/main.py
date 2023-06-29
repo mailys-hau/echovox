@@ -49,7 +49,7 @@ def _multiprocess(dname, opath, voxres):
 @cli.command(context_settings={"help_option_names": ["--help", "-h"], "show_default": True})
 @cli.argument("dicomdir", type=cli.Path(exists=True, resolve_path=True, path_type=WindowsPath))
 @cli.option("--voxel-resolution", "-r", "voxres", type=cli.Tuple([cli.FloatRange(min=0)] * 3),
-            nargs=3, default=[0.0007] * 3, help="Resolution of a voxel in millimeter.")
+            nargs=3, default=[0.0007] * 3, help="Resolution of a voxel in meter.")
 @cli.option("--output-directory", "-o", "opath",
             type=cli.Path(resolve_path=True, path_type=WindowsPath), default="voxels",
             help="Where to store generated voxel grids.")

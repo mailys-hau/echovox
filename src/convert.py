@@ -65,7 +65,7 @@ def main():
             type=cli.Path(resolve_path=True, path_type=Path, file_okay=False),
             help="Where to store all voxel grids.")
 @cli.option("--scaling", "-s", type=cli.Tuple([cli.FloatRange(min=0)] * 3),
-            nargs=3, default=[0.0005] * 3, help="Resolution of a voxel in centimeter.")
+            nargs=3, default=[0.0005] * 3, help="Resolution of a voxel in meter.")
 def nii2hdf(idir, gtdir, hdfdir, scaling):
     hdfdir.mkdir(parents=True, exist_ok=True)
     # TODO: Multiprocess this loop

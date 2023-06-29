@@ -38,9 +38,9 @@ def seq2vox(dname, pdir, opath, voxres, thickness, mode, contrast, postprocess):
 @cli.argument("dcmdir", type=cli.Path(exists=True, resolve_path=True, path_type=WindowsPath,
               file_okay=False))
 @cli.option("--voxel-resolution", "-r", "voxres", type=cli.Tuple([cli.FloatRange(min=0)] * 3),
-            nargs=3, default=[0.0007] * 3, help="Resolution of a voxel in millimeter.")
+            nargs=3, default=[0.0007] * 3, help="Resolution of a voxel in meter.")
 @cli.option("--thickness", "-t", type=cli.FloatRange(min=0), default=0.003,
-            help="Thickness of extruded leaflets' segmentation in millimeter.")
+            help="Thickness of extruded leaflets' segmentation in meter.")
 @cli.option("--extrusion-mode", "-m", "mode", default="normal",
             type=cli.Choice(["eigen", "normal", "filter", "region-growing"], case_sensitive=False),
             help="Which extrusion method to use (see README.txt).")
