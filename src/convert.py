@@ -13,7 +13,7 @@ from utils import get_fname, to_onehot, to_labels
 
 
 
-def _nii2hdf(iname, gtdir, hdfdir, scaling=[0.5, 0.5, 0.5]):
+def _nii2hdf(iname, gtdir, hdfdir, scaling=[0.0005, 0.0005, 0.0005]):
     # idir in contained in iname
     hname = get_fname(iname, hdfdir, ".h5")
     gtname = get_fname(iname, gtdir, ".nii")
