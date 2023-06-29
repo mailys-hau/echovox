@@ -1,5 +1,7 @@
 import numpy as np
 
+from warnings import warn
+
 from dicoms.utils import frame2arr
 from utils import LUT
 
@@ -11,6 +13,8 @@ def frames2vox(dcm_src, hdf, bbox, max_res, contrast):
         # API returns unsigned int
         lut = np.array(dcm_src.GetColorMap(), dtype=np.uint).astype(np.uint8)
     except AttributeError:
+        if contrast: # Don't print warning a lut will not be used
+            warn("No color map found in DICOM file, using a generic one. See `utils/lookup_table.py`", RuntimeWarning)
         lut = LUT
     out = {}
     for f in range(nb_frames):
