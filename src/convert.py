@@ -9,7 +9,7 @@ import numpy as np
 
 from pathlib import Path
 
-from utils import get_fname, to_onehot, to_labels
+from utils import get_fname, resample_voxel_grid, to_onehot, to_labels
 
 
 
@@ -17,21 +17,29 @@ def _nii2hdf(iname, gtdir, hdfdir, scaling=[0.0005, 0.0005, 0.0005]):
     # idir in contained in iname
     hname = get_fname(iname, hdfdir, ".h5")
     gtname = get_fname(iname, gtdir, ".nii")
+    frame = "01" # There's only one frame in the given NIFTIs
+    scaling = np.array(scaling)
+    # Save input
     iimg = nib.load(iname)
+    iarr = resample_voxel_grid(iimg, scaling)
     hdf = h5py.File(hname, 'w')
-    inp, gt = hdf.create_group("CartesianVolume"), hdf.create_group("GroundTruth")
-    inp.create_dataset("vol01", data=np.array(iimg.dataobj, dtype=np.uint8))
-    # Receive label encoding with 1=mitral annulus, 2=anterior, 3=posterior
+    inp = hdf.create_group("CartesianVolume")
+    inp.create_dataset(f"vol{frame}", data=iarr)
+    # Save ground truth
+    gt = hdf.create_group("GroundTruth")
     gtimg = nib.load(gtname)
-    gtarr = np.array(np.array(gtimg.dataobj, dtype=np.uint8))
-    onehot = to_onehot(gtarr, [0, 1])
-    gt.create_dataset("anterior-01", data=onehot[0])
-    gt.create_dataset("posterior-01", data=onehot[1])
+    gtarr = np.array(gtimg.dataobj, dtype=np.uint8)
+    # Receive label encoding with 1=mitral annulus, 2=anterior, 3=posterior
+    onehot = nib.Nifti1Image(to_onehot(gtarr, [0, 1]), gtimg.affine, gtimg.header)
+    onehot = resample_voxel_grid(onehot, scaling, bool)
+    gt.create_dataset(f"anterior-{frame}", data=onehot[0])
+    gt.create_dataset(f"posterior-{frame}", data=onehot[1])
+    # Save additional information
     info = hdf.create_group("VolumeGeometry")
-    info.create_dataset("frameNumber", data=1)
+    info.create_dataset("frameNumber", data=int(frame))
     info.create_dataset("directions", data=iimg.affine[:3, :3])
     info.create_dataset("origin", data=iimg.affine[:3, -1])
-    info.create_dataset("resolution", data=np.array(scaling))
+    info.create_dataset("resolution", data=scaling)
     hdf.close()
 
 def _hdf2nii(fname, idir, gtdir):
