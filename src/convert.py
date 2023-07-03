@@ -42,22 +42,34 @@ def _nii2hdf(iname, gtdir, hdfdir, scaling=[0.0005, 0.0005, 0.0005]):
     info.create_dataset("resolution", data=scaling)
     hdf.close()
 
-def _hdf2nii(fname, idir, gtdir):
+def _hdf2nii(fname, idir, gtdir, middle):
     hdf = h5py.File(fname, 'r')
     directions = hdf["VolumeGeometry"]["directions"][()]
     origin = np.expand_dims(hdf["VolumeGeometry"]["origin"][()], 0).T
     affine = np.vstack([np.hstack([directions, origin]), np.array([0, 0, 0, 1])])
-    for i in range(hdf["VolumeGeometry"]["frameNumber"][()]):
-        iname = get_fname(fname, idir, ".nii", i)
-        gtname = get_fname(fname, gtdir, ".nii", i)
+    if middle: # Only convert middle frame
+        idx = int(hdf["VolumeGeometry"]["frameNumber"][()] / 2) + 1
+        iname, gtname = get_fname(fname, idir, ".nii"), get_fname(fname, gtdir, ".nii")
         # TODO? Add more info in header
-        iimg = nib.Nifti1Image(hdf["CartesianVolume"][f"vol{i + 1:02d}"][()], affine)
-        ant = hdf["GroundTruth"][f"anterior-{i + 1:02d}"][()].astype(np.uint8)
-        post = hdf["GroundTruth"][f"posterior-{i + 1:02d}"][()].astype(np.uint8)
+        iimg = nib.Nifti1Image(hdf["CartesianVolume"][f"vol{idx:02d}"][()], affine)
+        ant = hdf["GroundTruth"][f"anterior-{idx:02d}"][()].astype(np.uint8)
+        post = hdf["GroundTruth"][f"posterior-{idx:02d}"][()].astype(np.uint8)
         gt = np.stack([ant, post])
         gtimg = nib.Nifti1Image(to_labels(gt), affine)
         nib.save(iimg, iname)
         nib.save(gtimg, gtname)
+    else:
+        for i in range(hdf["VolumeGeometry"]["frameNumber"][()]):
+            iname = get_fname(fname, idir, ".nii", i)
+            gtname = get_fname(fname, gtdir, ".nii", i)
+            # TODO? Add more info in header
+            iimg = nib.Nifti1Image(hdf["CartesianVolume"][f"vol{i + 1:02d}"][()], affine)
+            ant = hdf["GroundTruth"][f"anterior-{i + 1:02d}"][()].astype(np.uint8)
+            post = hdf["GroundTruth"][f"posterior-{i + 1:02d}"][()].astype(np.uint8)
+            gt = np.stack([ant, post])
+            gtimg = nib.Nifti1Image(to_labels(gt), affine)
+            nib.save(iimg, iname)
+            nib.save(gtimg, gtname)
     hdf.close()
 
 
@@ -92,8 +104,10 @@ def nii2hdf(idir, gtdir, hdfdir, scaling):
 @cli.option("--mask-directory", "-m", "gtdir", default="masks",
             type=cli.Path(resolve_path=True, path_type=Path, file_okay=False),
             help="Where to store ground truth segmentation mask.")
+@cli.option("--only-middle-frame", "-o/ ", "middle", is_flag=True, default=False,
+            help="Only convert middle frame contained in an HDF.")
 #TODO? Add an option that only convert middle frame
-def hdf2nii(hdfdir, idir, gtdir):
+def hdf2nii(hdfdir, idir, gtdir, middle):
     """
     Convert HDFs containing multiple volumes to several NIFTIs each containing one
     volume. Inputs and ground truth are stored in separate directories.
@@ -106,7 +120,7 @@ def hdf2nii(hdfdir, idir, gtdir):
         if fname.suffix != ".h5":
             print(f"Skipping {fname.name}, not an HDF.")
             continue
-        _hdf2nii(fname, idir, gtdir)
+        _hdf2nii(fname, idir, gtdir, middle)
 
 
 
