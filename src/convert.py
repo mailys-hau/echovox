@@ -31,7 +31,7 @@ def _nii2hdf(iname, gtdir, hdfdir, scaling=[0.0005, 0.0005, 0.0005]):
     gtarr = np.array(gtimg.dataobj, dtype=np.uint8)
     # Receive label encoding with 1=mitral annulus, 2=anterior, 3=posterior
     onehot = nib.Nifti1Image(to_onehot(gtarr, [0, 1]), gtimg.affine, gtimg.header)
-    onehot = resample_voxel_grid(onehot, scaling, bool)
+    onehot = resample_voxel_grid(onehot, scaling, bool, order=0)
     gt.create_dataset(f"anterior-{frame}", data=onehot[0])
     gt.create_dataset(f"posterior-{frame}", data=onehot[1])
     # Save additional information
