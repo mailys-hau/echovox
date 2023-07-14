@@ -9,7 +9,7 @@ import numpy as np
 
 from pathlib import Path
 
-from utils import get_fname, resample_voxel_grid, to_onehot, to_labels
+from utils import get_affine, get_fname, resample_voxel_grid, to_onehot, to_labels
 
 
 
@@ -45,17 +45,19 @@ def _nii2hdf(iname, gtdir, hdfdir, scaling=[0.0005, 0.0005, 0.0005]):
 def _hdf2nii(fname, idir, gtdir, middle):
     hdf = h5py.File(fname, 'r')
     directions = hdf["VolumeGeometry"]["directions"][()]
-    origin = np.expand_dims(hdf["VolumeGeometry"]["origin"][()], 0).T
-    affine = np.vstack([np.hstack([directions, origin]), np.array([0, 0, 0, 1])])
+    spacing = hdf["VolumeGeometry"]["resolution"][()]
+    affine = get_affine(directions, spacing)
+    header = nib.Nifti1Header()
+    header.set_xyzt_units(xyz=1) # Set unit to meter
     if middle: # Only convert middle frame
         idx = int(hdf["VolumeGeometry"]["frameNumber"][()] / 2) + 1
         iname, gtname = get_fname(fname, idir, ".nii"), get_fname(fname, gtdir, ".nii")
-        # TODO? Add more info in header
-        iimg = nib.Nifti1Image(hdf["CartesianVolume"][f"vol{idx:02d}"][()], affine)
+        # TODO? Add more info in header (directions, origin)
+        iimg = nib.Nifti1Image(hdf["CartesianVolume"][f"vol{idx:02d}"][()], affine, header=header)
         ant = hdf["GroundTruth"][f"anterior-{idx:02d}"][()].astype(np.uint8)
         post = hdf["GroundTruth"][f"posterior-{idx:02d}"][()].astype(np.uint8)
         gt = np.stack([ant, post])
-        gtimg = nib.Nifti1Image(to_labels(gt), affine)
+        gtimg = nib.Nifti1Image(to_labels(gt), affine, header=header)
         nib.save(iimg, iname)
         nib.save(gtimg, gtname)
     else:

@@ -2,6 +2,15 @@ import numpy as np
 
 
 
+def get_affine(directions, spacing):
+    # Return affine as defined by VTK
+    # Since y is deep axis, we use rows
+    dirs = directions / np.linalg.norm(directions, axis=0)
+    dirs = dirs * spacing
+    origin, rotation = np.zeros((3, 1)), np.array([0, 0, 0, 1])
+    return np.vstack([np.hstack([dirs, origin]), rotation])
+
+
 def get_fname(fname, dname, suffix, fidx=None):
     fidx = f"_{fidx}" if fidx is not None else ''
     return dname.joinpath(f"{fname.stem}{fidx}").with_suffix(suffix)
