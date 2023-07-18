@@ -8,12 +8,16 @@ import nibabel as nib
 import numpy as np
 
 from pathlib import Path
+from tqdm.contrib.concurrent import thread_map
 
 from utils import get_affine, get_fname, resample_voxel_grid, to_onehot, to_labels
 
 
 
 def _nii2hdf(iname, gtdir, hdfdir, scaling=[0.0005, 0.0005, 0.0005]):
+    if iname.suffix != ".nii":
+        print(f"Skipping {iname.name}, not an NIfTI.")
+        return
     # idir in contained in iname
     hname = get_fname(iname, hdfdir, ".h5")
     gtname = get_fname(iname, gtdir, ".nii")
@@ -43,6 +47,9 @@ def _nii2hdf(iname, gtdir, hdfdir, scaling=[0.0005, 0.0005, 0.0005]):
     hdf.close()
 
 def _hdf2nii(fname, idir, gtdir, middle):
+    if fname.suffix != ".h5":
+        print(f"Skipping {fname.name}, not an HDF.")
+        return
     hdf = h5py.File(fname, 'r')
     directions = hdf["VolumeGeometry"]["directions"][()]
     spacing = hdf["VolumeGeometry"]["resolution"][()]
@@ -88,15 +95,14 @@ def main():
             help="Where to store all voxel grids.")
 @cli.option("--scaling", "-s", type=cli.Tuple([cli.FloatRange(min=0)] * 3),
             nargs=3, default=[0.0005] * 3, help="Resolution of a voxel in meter.")
-def nii2hdf(idir, gtdir, hdfdir, scaling):
+@cli.option("--number-workers", "-n", "nb_workers", type=cli.IntRange(min=1), default=1,
+            help="Number of workers used to accelerate file processing.")
+def nii2hdf(idir, gtdir, hdfdir, scaling, nb_workers):
     hdfdir.mkdir(parents=True, exist_ok=True)
-    # TODO: Multiprocess this loop
-    for fname in idir.iterdir():
-        if fname.suffix != ".nii":
-            print(f"Skipping {fname.name}, not a NIfTI.")
-            continue
-        _nii2hdf(fname, gtdir, hdfdir, scaling)
-
+    nbfiles = len(list(idir.glob("*.nii")))
+    thread_map(lambda fname: _nii2hdf(fname, gtdir, hdfdir, scaling), idir.iterdir(), max_workers=nb_workers,
+               # Pretty progress bar
+               desc="Processed", unit="files", total=nbfiles, colour="green")
 
 @main.command(name="hdf2nii", short_help="Convert HDFs to NIfTIs.")
 @cli.argument("hdfdir", type=cli.Path(exists=True, resolve_path=True, path_type=Path, file_okay=False))
@@ -108,7 +114,9 @@ def nii2hdf(idir, gtdir, hdfdir, scaling):
             help="Where to store ground truth segmentation mask.")
 @cli.option("--only-middle-frame", "-o/ ", "middle", is_flag=True, default=False,
             help="Only convert middle frame contained in an HDF.")
-def hdf2nii(hdfdir, idir, gtdir, middle):
+@cli.option("--number-workers", "-n", "nb_workers", type=cli.IntRange(min=1), default=1,
+            help="Number of workers used to accelerate file processing.")
+def hdf2nii(hdfdir, idir, gtdir, middle, nb_workers):
     """
     Convert HDFs containing multiple volumes to several NIfTIs each containing one
     volume. Inputs and ground truth are stored in separate directories.
@@ -116,12 +124,10 @@ def hdf2nii(hdfdir, idir, gtdir, middle):
     HDFDIR    PATH    Directory of HDFs containing voxels.
     """
     idir.mkdir(parents=True, exist_ok=True), gtdir.mkdir(parents=True, exist_ok=True)
-    # TODO: Multiprocess this loop
-    for fname in hdfdir.iterdir():
-        if fname.suffix != ".h5":
-            print(f"Skipping {fname.name}, not an HDF.")
-            continue
-        _hdf2nii(fname, idir, gtdir, middle)
+    nbfiles = len(list(hdfdir.glob("*.h5")))
+    thread_map(lambda fname: _hdf2nii(fname, idir, gtdir, middle), hdfdir.iterdir(), max_workers=nb_workers,
+               # Pretty progress bar
+               desc="Processed", unit="files", total=nbfiles, colour="green")
 
 
 
