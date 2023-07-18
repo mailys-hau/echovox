@@ -1,5 +1,5 @@
 """
-Convert HDFs to NIFTIs and vice versa. Tool box for NTNU-Polimi collaboration.
+Convert HDFs to NIfTIs and vice versa. Tool box for NTNU-Polimi collaboration.
 """
 
 import click as cli
@@ -17,7 +17,7 @@ def _nii2hdf(iname, gtdir, hdfdir, scaling=[0.0005, 0.0005, 0.0005]):
     # idir in contained in iname
     hname = get_fname(iname, hdfdir, ".h5")
     gtname = get_fname(iname, gtdir, ".nii")
-    frame = "01" # There's only one frame in the given NIFTIs
+    frame = "01" # There's only one frame in the given NIfTIs
     scaling = np.array(scaling)
     # Save input
     iimg = nib.load(iname)
@@ -80,7 +80,7 @@ def main():
     pass
 
 
-@main.command(name="nii2hdf", short_help="Convert NIFTIs to HDFs.")
+@main.command(name="nii2hdf", short_help="Convert NIfTIs to HDFs.")
 @cli.argument("idir", type=cli.Path(exists=True, resolve_path=True, path_type=Path, file_okay=False))
 @cli.argument("gtdir", type=cli.Path(exists=True, resolve_path=True, path_type=Path, file_okay=False))
 @cli.option("--hdf-directory", "-d", "hdfdir", default="hdf",
@@ -93,12 +93,12 @@ def nii2hdf(idir, gtdir, hdfdir, scaling):
     # TODO: Multiprocess this loop
     for fname in idir.iterdir():
         if fname.suffix != ".nii":
-            print(f"Skipping {fname.name}, not a NIFTI.")
+            print(f"Skipping {fname.name}, not a NIfTI.")
             continue
         _nii2hdf(fname, gtdir, hdfdir, scaling)
 
 
-@main.command(name="hdf2nii", short_help="Convert HDFs to NIFTIs.")
+@main.command(name="hdf2nii", short_help="Convert HDFs to NIfTIs.")
 @cli.argument("hdfdir", type=cli.Path(exists=True, resolve_path=True, path_type=Path, file_okay=False))
 @cli.option("--image-directory", "-i", "idir", default="images",
             type=cli.Path(resolve_path=True, path_type=Path, file_okay=False),
@@ -108,10 +108,9 @@ def nii2hdf(idir, gtdir, hdfdir, scaling):
             help="Where to store ground truth segmentation mask.")
 @cli.option("--only-middle-frame", "-o/ ", "middle", is_flag=True, default=False,
             help="Only convert middle frame contained in an HDF.")
-#TODO? Add an option that only convert middle frame
 def hdf2nii(hdfdir, idir, gtdir, middle):
     """
-    Convert HDFs containing multiple volumes to several NIFTIs each containing one
+    Convert HDFs containing multiple volumes to several NIfTIs each containing one
     volume. Inputs and ground truth are stored in separate directories.
 
     HDFDIR    PATH    Directory of HDFs containing voxels.
