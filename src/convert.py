@@ -98,6 +98,13 @@ def main():
 @cli.option("--number-workers", "-n", "nb_workers", type=cli.IntRange(min=1), default=1,
             help="Number of workers used to accelerate file processing.")
 def nii2hdf(idir, gtdir, hdfdir, scaling, nb_workers):
+    """
+    Convert two NIfTIs volumes to HDFs, associating NIfTIs for input and ground truth in one HDF.
+
+    \b
+    IDIR     PATH    Directory of input NIfTIs.
+    GTDIR    PATH    Directory of ground truth NIfTIs.
+    """
     hdfdir.mkdir(parents=True, exist_ok=True)
     nbfiles = len(list(idir.glob("*.nii")))
     thread_map(lambda fname: _nii2hdf(fname, gtdir, hdfdir, scaling), idir.iterdir(), max_workers=nb_workers,
